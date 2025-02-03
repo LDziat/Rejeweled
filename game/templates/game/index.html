@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=.75">
+    <title>Bejeweled Multiplayer</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background-color: #330033;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Container to hold the logo and grid side by side */
+        .game-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px; /* Space between logo and grid */
+            width: 100%;
+            max-width: 100vw;
+            flex-wrap: wrap; /* Wrap if necessary */
+        }
+        
+        .logo {
+            width: 25%;
+            max-width: 512px; /* Prevents it from getting too big */
+        }
+        
+        /* Grid adjustments */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            background-color: purple;
+            gap: 4px;
+            justify-content: center;
+            width: 100%; /* Adjusted to fit next to the logo */
+            max-width: 80vh; /* Ensures it doesn’t get too wide */
+            aspect-ratio: 1 / 1;
+        }
+        
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid purple;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Flower wrapper to handle flexible layout */
+        .flower {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+        
+        /* Ensure all gems have the same color */
+        .red, .blue, .green, .yellow, .purple, .orange, .white {
+            background-color: purple;
+        }
+        
+        /* Smooth animations */
+        .cell {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        
+        .empty {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        
+    </style>
+    
+</head>
+<body>
+    <div class="game-container">
+        <div>
+    <h1><img class='logo', src='/static/ui/logo.png'></h1>
+        </div>
+        <div>
+    <div class="grid" id="game-board"></div>
+        </div>
+    </div>
+    <script>
+        const socket = new WebSocket("ws://192.168.0.125:8484/ws/game/");
+        const gemImages = {
+            "red": "gem_1.gif",
+            "blue": "gem_2.gif",
+            "green": "gem_3.gif",
+            "yellow": "gem_4.gif",
+            "purple": "gem_5.gif",
+            "orange": "gem_6.gif",
+            "white": "gem_7.gif"
+        };
+        const gemSpinImages = {
+            "red": "gem_1_spin.gif",
+            "blue": "gem_2_spin.gif",
+            "green": "gem_3_spin.gif",
+            "yellow": "gem_4_spin.gif",
+            "purple": "gem_5_spin.gif",
+            "orange": "gem_6_spin.gif",
+            "white": "gem_7_spin.gif"
+        };
+    
+        // Create an audio object to play the match sound
+        const matchSound = new Audio('/static/sound/snd.mp3');
+        const fallSound = new Audio('/static/sound/click.mp3');
+    
+        let selectedCell = null;
+        let previousBoard = [];
+    
+        socket.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            updateBoard(data.board);
+        };
+    
+        function createCell(x, y, gem) {
+            let cell = document.createElement("div");
+            cell.id = `cell-${y}-${x}`;
+            cell.className = `cell ${gem}`;
+    
+            let img = document.createElement("img");
+            img.src = `/static/gems/${gemImages[gem]}`;
+            img.alt = gem;
+            img.className = "gem-img";
+    
+            cell.appendChild(img);
+            cell.dataset.x = x;
+            cell.dataset.y = y;
+            cell.dataset.gem = gem || "";
+            cell.onclick = () => selectGem(cell, x, y);
+            return cell;
+        }
+    
+        function updateBoard(board) {
+            let matchFound = false; // Track if a match is found
+            let emptyCells = 0;
+            let previousEmptyCells = 0;
+    
+            // Count empty cells in the previous and current board
+            previousBoard.forEach((row, y) => {
+                row.forEach((gem, x) => {
+                    if (!gem) previousEmptyCells++;
+                });
+            });
+    
+            board.forEach((row, y) => {
+                row.forEach((gem, x) => {
+                    let cell = document.getElementById(`cell-${y}-${x}`);
+    
+                    if (!cell) {
+                        cell = createCell(x, y, gem);
+                        document.getElementById("game-board").appendChild(cell);
+                    }
+    
+                    if (cell.dataset.gem !== gem) {
+                        cell.className = `cell ${gem}`;
+                        cell.dataset.gem = gem;
+    
+                        let img = cell.querySelector("img");
+                        if (img) {
+                            if (gem) {
+                                img.src = `/static/gems/${gemImages[gem]}`;
+                                img.alt = gem;
+                                cell.style.border = "2px solid purple";
+                            } else {
+                                img.src = ``;
+                                img.alt = ``;
+                                cell.style.border = "2px solid purple";
+                            }
+                        }
+                    }
+    
+                    // Count empty cells in the current board
+                    if (!gem) emptyCells++;
+                });
+            });
+    
+            // If more empty cells are found in the current board compared to the previous frame, play the sound
+            if (emptyCells > previousEmptyCells) {
+                matchFound = true;
+            }
+    
+            // If a match is found, play the sound
+            if (matchFound) {
+                matchSound.play();
+            }
+    
+            // Update the previous board state for the next frame
+            previousBoard = board;
+            fallSound.play();
+        }
+    
+        function selectGem(cell, x, y) {
+            let img = cell.querySelector("img");
+    
+            if (selectedCell) {
+                let prevImg = selectedCell.querySelector("img");
+                if (prevImg) {
+                    prevImg.src = `/static/gems/${gemImages[selectedCell.dataset.gem]}`;
+                }
+    
+                const x1 = selectedCell.dataset.x, y1 = selectedCell.dataset.y;
+                socket.send(JSON.stringify({ x1, y1, x2: x, y2: y }));
+    
+                selectedCell.style.border = "2px solid purple";
+                selectedCell = null;
+            } else {
+                selectedCell = cell;
+                cell.style.border = "2px solid white";
+    
+                if (img && gemSpinImages[cell.dataset.gem]) {
+                    img.src = `/static/gems/${gemSpinImages[cell.dataset.gem]}`;
+                }
+            }
+        }
+    </script>
+    
+    
+</body>
+</html>
