@@ -80,17 +80,15 @@
             opacity: 0;
             transform: translateY(-50px);
         }
-        
-    </style>
-    
+        </style>
 </head>
 <body>
     <div class="game-container">
         <div>
-    <h1><img class='logo', src='/static/ui/logo.png'></h1>
+            <h1><img class='logo' src='/static/ui/logo.png'></h1>
         </div>
         <div>
-    <div class="grid" id="game-board"></div>
+            <div class="grid" id="game-board"></div>
         </div>
     </div>
     <script>
@@ -113,121 +111,119 @@
             "orange": "gem_6_spin.gif",
             "white": "gem_7_spin.gif"
         };
-    
-        // Create an audio object to play the match sound
+
         const matchSound = new Audio('/static/sound/snd.mp3');
         const fallSound = new Audio('/static/sound/click.mp3');
-    
+
         let selectedCell = null;
-        let previousBoard = [];
-    
-        socket.onmessage = function (event) {
+        let localBoard = [];
+        let playerId = null;
+        let gameBoard = document.getElementById("game-board");
+
+        // Initialize empty grid
+        for (let y = 0; y < 8; y++) {
+            for (let x = 0; x < 8; x++) {
+                let cell = createCell(x, y, null);
+                gameBoard.appendChild(cell);
+            }
+        }
+
+        socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
+            if (!playerId) {
+                playerId = data.player_id;
+            }
+            localBoard = data.board;
             updateBoard(data.board);
         };
-    
+
         function createCell(x, y, gem) {
             let cell = document.createElement("div");
             cell.id = `cell-${y}-${x}`;
-            cell.className = `cell ${gem}`;
-    
-            let img = document.createElement("img");
-            img.src = `/static/gems/${gemImages[gem]}`;
-            img.alt = gem;
-            img.className = "gem-img";
-    
-            cell.appendChild(img);
+            cell.className = `cell ${gem || ''}`;
             cell.dataset.x = x;
             cell.dataset.y = y;
             cell.dataset.gem = gem || "";
+
+            let img = document.createElement("img");
+            if (gem) {
+                img.src = `/static/gems/${gemImages[gem]}`;
+                img.alt = gem;
+            }
+            img.className = "gem-img";
+
+            cell.appendChild(img);
             cell.onclick = () => selectGem(cell, x, y);
             return cell;
         }
-    
+
         function updateBoard(board) {
-            let matchFound = false; // Track if a match is found
-            let emptyCells = 0;
-            let previousEmptyCells = 0;
-    
-            // Count empty cells in the previous and current board
-            previousBoard.forEach((row, y) => {
-                row.forEach((gem, x) => {
-                    if (!gem) previousEmptyCells++;
-                });
-            });
-    
+            let matchFound = false;
             board.forEach((row, y) => {
                 row.forEach((gem, x) => {
                     let cell = document.getElementById(`cell-${y}-${x}`);
-    
-                    if (!cell) {
-                        cell = createCell(x, y, gem);
-                        document.getElementById("game-board").appendChild(cell);
-                    }
-    
                     if (cell.dataset.gem !== gem) {
-                        cell.className = `cell ${gem}`;
-                        cell.dataset.gem = gem;
-    
+                        cell.className = `cell ${gem || ''}`;
+                        cell.dataset.gem = gem || "";
+                        
                         let img = cell.querySelector("img");
                         if (img) {
                             if (gem) {
                                 img.src = `/static/gems/${gemImages[gem]}`;
                                 img.alt = gem;
-                                cell.style.border = "2px solid purple";
                             } else {
-                                img.src = ``;
-                                img.alt = ``;
-                                cell.style.border = "2px solid purple";
+                                img.src = "";
+                                img.alt = "";
                             }
                         }
+                        matchFound = true;
                     }
-    
-                    // Count empty cells in the current board
-                    if (!gem) emptyCells++;
                 });
             });
-    
-            // If more empty cells are found in the current board compared to the previous frame, play the sound
-            if (emptyCells > previousEmptyCells) {
-                matchFound = true;
-            }
-    
-            // If a match is found, play the sound
+
             if (matchFound) {
                 matchSound.play();
+                fallSound.play();
             }
-    
-            // Update the previous board state for the next frame
-            previousBoard = board;
-            fallSound.play();
         }
-    
+
         function selectGem(cell, x, y) {
+            if (!cell.dataset.gem) return;
+            
             let img = cell.querySelector("img");
-    
+            
             if (selectedCell) {
                 let prevImg = selectedCell.querySelector("img");
                 if (prevImg) {
                     prevImg.src = `/static/gems/${gemImages[selectedCell.dataset.gem]}`;
                 }
-    
-                const x1 = selectedCell.dataset.x, y1 = selectedCell.dataset.y;
-                socket.send(JSON.stringify({ x1, y1, x2: x, y2: y }));
-    
+                
+                const x1 = parseInt(selectedCell.dataset.x);
+                const y1 = parseInt(selectedCell.dataset.y);
+                
+                if (isValidMove(x1, y1, x, y)) {
+                    const tempBoard = JSON.parse(JSON.stringify(localBoard));
+                    [tempBoard[y1][x1], tempBoard[y][x]] = [tempBoard[y][x], tempBoard[y1][x1]];
+                    localBoard = tempBoard;
+                    updateBoard(localBoard);
+                    socket.send(JSON.stringify({ x1, y1, x2: x, y2: y }));
+                }
+                
                 selectedCell.style.border = "2px solid purple";
                 selectedCell = null;
             } else {
                 selectedCell = cell;
                 cell.style.border = "2px solid white";
-    
+                
                 if (img && gemSpinImages[cell.dataset.gem]) {
                     img.src = `/static/gems/${gemSpinImages[cell.dataset.gem]}`;
                 }
             }
         }
+
+        function isValidMove(x1, y1, x2, y2) {
+            return Math.abs(x1 - x2) + Math.abs(y1 - y2) === 1;
+        }
     </script>
-    
-    
 </body>
 </html>
