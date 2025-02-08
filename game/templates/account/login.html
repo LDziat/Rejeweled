@@ -16,6 +16,7 @@
         <br>
         <button type="submit">Login</button>
     </form>
+    <a href="{% url 'signup' %}">Sign Up</a>
     {% if form.errors %}
         <p>Invalid username or password. Try again.</p>
     {% endif %}
