@@ -3,18 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <title>Login</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background-color: #330033;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        h2{
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <h2>Login to Play</h2>
+    <div class="container">
     <form method="POST">
         {% csrf_token %}
+        <label for="username">Username:</label>
         <input type="text" name="username" placeholder="Username" required>
+        <br>
+        <label for="password">Password:</label>
         <input type="password" name="password" placeholder="Password" required>
+        <br>
         <button type="submit">Sign Up</button>
     </form>
-    
+    <a href="{% url 'login' %}">Log In</a>    
     {% if form.errors %}
         <p>Invalid username or password. Try again.</p>
     {% endif %}
+    </div>
 </body>
 </html>
